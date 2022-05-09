@@ -37,11 +37,9 @@ fn read_file() -> Vec<i32> {
 
     f.read_to_string(&mut contents).unwrap();
 
-    let nums: Vec<i32> = contents
+    contents
         .split('\n')
         .filter(|x| x.len() > 0)
         .map(|x| i32::from_str(x).unwrap())
-        .collect();
-
-    nums
+        .collect()
 }
