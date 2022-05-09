@@ -6,7 +6,10 @@ fn main() -> () {
     let depths = read_file();
 
     println!("Problem1: {}", count_increasing_depths(&depths));
-    println!("Problem2: {}", count_increasing_depths(&combine_depths(&depths)));
+    println!(
+        "Problem2: {}",
+        count_increasing_depths(&combine_depths(&depths))
+    );
 }
 
 fn count_increasing_depths(depths: &Vec<i32>) -> i32 {
@@ -22,7 +25,8 @@ fn count_increasing_depths(depths: &Vec<i32>) -> i32 {
 }
 
 fn combine_depths(depths: &Vec<i32>) -> Vec<i32> {
-    depths.windows(3)
+    depths
+        .windows(3)
         .map(|window| window[0] + window[1] + window[2])
         .collect()
 }
