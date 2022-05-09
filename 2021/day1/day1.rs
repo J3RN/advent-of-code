@@ -13,15 +13,7 @@ fn main() -> () {
 }
 
 fn count_increasing_depths(depths: &Vec<i32>) -> i32 {
-    let mut count = 0;
-
-    for pair in depths.windows(2) {
-        if pair[1] > pair[0] {
-            count += 1
-        }
-    }
-
-    count
+    depths.windows(2).filter(|pair| pair[1] > pair[0]).count() as i32
 }
 
 fn combine_depths(depths: &Vec<i32>) -> Vec<i32> {
