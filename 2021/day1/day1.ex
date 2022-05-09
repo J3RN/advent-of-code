@@ -13,11 +13,11 @@ defmodule Day1 do
 
   def problem2 do
     read_file()
-    |> combine_depths()
+    |> sum_triples()
     |> count_increasing_depths()
   end
 
-  def combine_depths(depths) do
+  def sum_triples(depths) do
     depths
     |> Enum.chunk_every(3, 1, :discard)
     |> Enum.map(&Enum.sum/1)
