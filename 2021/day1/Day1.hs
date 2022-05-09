@@ -1,6 +1,11 @@
-module Day1 (problem1, problem2) where
-
 import Control.Monad (liftM2, liftM3)
+
+main :: IO ()
+main = do
+  content <- readFile "input.txt"
+  let depths = parseFile content
+  putStrLn . show . problem1 $ depths
+  putStrLn . show . problem2 $ depths
 
 chunk2 :: [t] -> [(t, t)]
 chunk2 = liftM2 zip id (drop 1)
@@ -12,4 +17,11 @@ problem1 :: [Int] -> Int
 problem1 = length . filter (\(x, y) -> y > x) . chunk2
 
 problem2 :: [Int] -> Int
-problem2 = length . filter (\(x, y) -> y > x) . chunk2 . map (\(x, y, z) -> x + y + z) . chunk3
+problem2 = length .
+  filter (\(x, y) -> y > x) .
+  chunk2 .
+  map (\(x, y, z) -> x + y + z) .
+  chunk3
+
+parseFile :: String -> [Int]
+parseFile = map read . lines
