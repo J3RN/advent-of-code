@@ -15,6 +15,23 @@ pub fn problem1() -> Result(Nil, file.Reason) {
   })
 }
 
+pub fn problem2() -> Result(Nil, file.Reason) {
+  read_input()
+  |> result.map(fn(input) {
+    input
+    |> combine_depths()
+    |> count_increasing_depths()
+    |> int.to_string()
+    |> io.println()
+  })
+}
+
+fn combine_depths(depths) {
+  depths
+  |> list.window(3)
+  |> list.map(int.sum)
+}
+
 fn count_increasing_depths(depths) {
   list.window_by_2(depths)
   |> list.filter(fn(pair) {
