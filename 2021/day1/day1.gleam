@@ -6,14 +6,13 @@ import gleam/result
 import gleam/string
 
 pub fn problem1() -> Result(Nil, file.Reason) {
-  try input = read_input()
-
-  input
-  |> count_increasing_depths()
-  |> int.to_string()
-  |> io.println()
-
-  Ok(Nil)
+  read_input()
+  |> result.map(fn(input) {
+    input
+    |> count_increasing_depths()
+    |> int.to_string()
+    |> io.println()
+  })
 }
 
 fn count_increasing_depths(depths) {
