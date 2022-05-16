@@ -17,10 +17,10 @@ pub fn problem1() -> Result(Nil, file.Reason) {
 
 fn count_increasing_depths(depths) {
   list.window_by_2(depths)
-  |> list.filter(fn (pair) {
-      let #(a, b) = pair
-      a < b
-    })
+  |> list.filter(fn(pair) {
+    let #(a, b) = pair
+    a < b
+  })
   |> list.length()
 }
 
