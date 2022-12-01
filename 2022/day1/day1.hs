@@ -7,17 +7,19 @@ import qualified Data.Text.Read as TR
 
 import Data.Either
 import Data.List
+import Text.Printf
 
 main :: IO ()
 main = do
   rawInput <- TIO.readFile "input"
   let groups = groupInput rawInput
-  let parsedInput = castStrings groups
-  putStrLn . show . maximum . map sum $ parsedInput
-  putStrLn . show . sum . take 3 . sortBy (flip compare) . map sum $ parsedInput
+  let parsedInput = parseStrings groups
+  let sums = map sum parsedInput
+  printf "Max: %d\n" . maximum $ sums
+  printf "Sum of top 3: %d\n" . sum . take 3 . sortBy (flip compare) $ sums
 
-castStrings :: [[T.Text]] -> [[Integer]]
-castStrings groups = map (map textToInt) groups
+parseStrings :: [[T.Text]] -> [[Integer]]
+parseStrings groups = map (map textToInt) groups
 
 -- If text is unable to be parsed to an integer, it will be parsed as '0'
 textToInt :: T.Text -> Integer
