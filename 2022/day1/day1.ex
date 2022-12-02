@@ -7,6 +7,7 @@ group_sums =
   |> Enum.map(&String.split(&1, "\n"))
   |> Enum.map(fn group -> Enum.map(group, &String.to_integer/1) end)
   |> Enum.map(&Enum.sum/1)
+  |> Enum.sort(:desc)
 
 max = Enum.max(group_sums)
 IO.puts("Max: #{max}")
