@@ -4,9 +4,25 @@ import qualified Data.Text.IO as TIO
 import qualified Data.Text as T
 
 import Text.Printf
+import Data.List(find)
+import Data.Maybe(fromJust)
 
-data Outcome = Loss | Draw | Win
-data Play = Rock | Paper | Scissors
+data Outcome = Loss | Draw | Win deriving Eq
+data Play = Rock | Paper | Scissors deriving Eq
+data Game = Game {theirPlay :: Play, myPlay :: Play, outcome :: Outcome}
+
+games :: [Game]
+games = [
+           (Game Rock Rock Draw),
+           (Game Rock Paper Win),
+           (Game Rock Scissors Loss),
+           (Game Paper Rock Loss),
+           (Game Paper Paper Draw),
+           (Game Paper Scissors Win),
+           (Game Scissors Rock Win),
+           (Game Scissors Paper Loss),
+           (Game Scissors Scissors Draw)
+           ]
 
 main :: IO ()
 main = do
@@ -41,13 +57,8 @@ outcomeToScore Draw = 3
 outcomeToScore Win = 6
 
 computeOutcome :: Play -> Play -> Outcome
-computeOutcome Rock Paper = Win
-computeOutcome Rock Scissors = Loss
-computeOutcome Scissors Rock = Win
-computeOutcome Scissors Paper = Loss
-computeOutcome Paper Scissors = Win
-computeOutcome Paper Rock = Loss
-computeOutcome _ _ = Draw
+computeOutcome theirs mine =
+  outcome . fromJust . find (\x -> (theirPlay x == theirs && myPlay x == mine)) $ games
 
 computeOutcome' :: T.Text -> Outcome
 computeOutcome' "X" = Loss
@@ -63,13 +74,8 @@ computePlay "C" = Scissors
 computePlay "Z" = Scissors
 
 computePlay' :: Play -> Outcome -> Play
-computePlay' Rock Loss = Scissors
-computePlay' Rock Win = Paper
-computePlay' Paper Loss = Rock
-computePlay' Paper Win = Scissors
-computePlay' Scissors Loss = Paper
-computePlay' Scissors Win = Rock
-computePlay' a Draw = a
+computePlay' theirs result =
+  myPlay . fromJust . find (\x -> (theirPlay x == theirs && outcome x == result)) $ games
 
 playScore :: Play -> Integer
 playScore Rock = 1
