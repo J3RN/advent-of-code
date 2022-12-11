@@ -20,11 +20,11 @@ main = do
   contents <- readFile "input"
   steps <- either (fail . show) pure $ runParser parseFile () "input" contents
   let states = scanl moveList [(0,0), (0,0)] steps
-      uniquePos = nub . map (head . reverse) $ states
+      uniquePos = nub . map last $ states
       numUnique = length uniquePos
   printf "Unique tail positions: %d\n" numUnique
   let intermediateLists = scanl moveList (replicate 10 (0, 0)) steps
-      uniquePos' = nub . map (head . reverse) $ intermediateLists
+      uniquePos' = nub . map last $ intermediateLists
       numUnique' = length uniquePos'
   printf "Unique 10' tail positions: %d\n" numUnique'
 
