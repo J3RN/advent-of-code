@@ -2,11 +2,17 @@ import Text.Parsec
 import Text.Parsec.Pos
 import Text.Parsec.String (Parser)
 
+import Text.Printf (printf)
+
+import Data.List (intersect, nub)
+
+import Debug.Trace (trace)
+
 type Pos = (Int, Int)
 
-data BoardState = BoardState { headPos :: Pos
-                             , tailPos :: Pos
-                             }
+data PairState = PairState { headPos :: Pos
+                           , tailPos :: Pos
+                           }
 
 data Step
   = R
@@ -15,28 +21,45 @@ data Step
   | D
   deriving Show
 
-surroundingEight :: Pos -> [Pos]
-surroundingEight (row, col) =
-  [(r, c) | r <- [row-1..row+1], c <- [col-1..col+1], (r /= row || c /= col)]
+main :: IO ()
+main = do
+  contents <- readFile "input"
+  steps <- either (fail . show) pure $ runParser parseFile () "input" contents
+  let states = scanl applyStep (PairState {headPos = (0, 0), tailPos = (0, 0)}) steps
+      uniquePos = nub . map tailPos $ states
+      numUnique = length uniquePos
+  printf "Unique tail poses: %d\n" numUnique
 
-isMoveRequired :: Pos -> Pos -> Bool
-isMoveRequired headPos tailPos =
-  if headPos `elem` (surroundingEight tailPos)
-  then False
-  else True
+applyStep :: PairState -> Step -> PairState
+applyStep state step =
+  moveTail (moveHead state step)
 
-moveHead :: BoardState -> Step -> BoardState
-moveHead (BoardState headPos tailPos) step =
-  (BoardState (move headPos step) tailPos)
-  where move (r, c) R = (r, c + 1)
-        move (r, c) L = (r, c - 1)
-        move (r, c) U = (r - 1, c)
-        move (r, c) D = (r + 1, c)
+-- Surrounding also includes the given point
+surrounding :: Pos -> [Pos]
+surrounding (row, col) =
+  [(r, c) | r <- [row-1..row+1], c <- [col-1..col+1]]
+
+moveHead :: PairState -> Step -> PairState
+moveHead (PairState hPos tPos) step =
+  (PairState (moveKnot hPos step) tPos)
+
+moveKnot :: Pos -> Step -> Pos
+moveKnot (r, c) R = (r, c + 1)
+moveKnot (r, c) L = (r, c - 1)
+moveKnot (r, c) U = (r - 1, c)
+moveKnot (r, c) D = (r + 1, c)
+
+diagonals :: Pos -> [Pos]
+diagonals (row, col) =
+  [(r,c) | r <- [row-1..row+1], c <- [col-1..col+1], (r /= row && c /= col)]
 
 -- Catch the tail up to the head, if necessary
-moveTail :: BoardState -> BoardState
-moveTail (headPos@(hRow, hCol), tailPos@(tRow, tCol)) =
-  
+moveTail :: PairState -> PairState
+moveTail (PairState hPos@(hRow, hCol) tPos@(tRow, tCol))
+  | hPos `elem` (surrounding tPos) = PairState hPos tPos
+  | hRow /= tRow && hCol == tCol = PairState hPos ((hRow + tRow) `div` 2, hCol)
+  | hRow == tRow && hCol /= tCol = PairState hPos (hRow, (hCol + tCol) `div` 2)
+  | otherwise = PairState hPos (head ((diagonals tPos) `intersect` (surrounding hPos)))
 
 --- Parser
 -- Notably, the parser will expand lines such as "R 2" to [R, R]
