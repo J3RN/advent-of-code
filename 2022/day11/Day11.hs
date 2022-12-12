@@ -67,10 +67,6 @@ data Operand
   = Old
   | Val Int
 
-data Operation
-  = Add
-  | Mul
-
 parseFile :: Parser [Monkey]
 parseFile = do
   ms <- sepEndBy parseMonkey (char '\n')
@@ -99,9 +95,9 @@ parseItems = do
 parseOperation :: Parser (Int -> Int)
 parseOperation = do
   _ <- string "  Operation: new = "
-  exp <- parseExp
+  e <- parseExp
   _ <- char '\n'
-  return exp
+  return e
 
 parseExp :: Parser (Int -> Int)
 parseExp = do
@@ -116,7 +112,7 @@ toFun :: Operand -> (Int -> Int -> Int) -> Operand -> (Int -> Int)
 toFun Old     op Old     = (\x -> op x x)
 toFun Old     op (Val a) = (\x -> op x a)
 toFun (Val a) op Old     = (\x -> op a x)
-toFun (Val a) op (Val b) = (\x -> op a b)
+toFun (Val a) op (Val b) = (\_ -> op a b)
 
 parseOperand :: Parser Operand
 parseOperand = parseOld <|> parseVal
