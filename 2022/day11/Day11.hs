@@ -38,7 +38,7 @@ main = do
       mb = monkeyBusiness . nTimes 20 Main.round $ monkeys
   printf "Monkey business after 20: %d\n" mb
 
--- Known as @iterate'@ in Agda
+-- Known as 'iterate'' in Agda
 nTimes :: Int -> (a -> a) -> a -> a
 nTimes 0 _fun a = a
 nTimes n fun a = nTimes (n - 1) fun (fun a)
@@ -70,7 +70,7 @@ processItem worryOp monkey monkeys item =
 
 addItem :: Monkey -> Item -> Monkey
 addItem monkey item =
-  -- Yes, it pains me to use @++@
+  -- Yes, it pains me to use '++'
   monkey { items = (items monkey) ++ [item] }
 
 applyOperation :: Item -> Expression -> Item
