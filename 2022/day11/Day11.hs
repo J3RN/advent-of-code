@@ -9,16 +9,26 @@ import Data.List (sortOn)
 type MonkeyIx = Int
 type Item = Int
 
+data Operand
+  = Old
+  | Val Int
+
+data Operation
+  = Add
+  | Mul
+
+data Expression = Expression Operand Operation Operand
+
 data Monkey = Monkey { items :: [Item]
-                     , operation :: Item -> Item
+                     , operation :: Expression
                      , test :: Item -> Bool
                      , ifTrue :: MonkeyIx
                      , ifFalse :: MonkeyIx
-                     , itemCursor :: Int
+                     , numProcessed :: Int
                      }
 
 instance Show Monkey where
-  show (Monkey {items = is, itemCursor = ic}) = "Items: " <> (show . drop ic $ is)
+  show m = printf "Num Processed: %d" (numProcessed m)
 
 main :: IO ()
 main = do
@@ -35,25 +45,26 @@ nTimes n fun a = nTimes (n - 1) fun (fun a)
 
 monkeyBusiness :: Array MonkeyIx Monkey -> Int
 monkeyBusiness monkeys =
-  let top2 = take 2 . sortOn negate . map itemCursor . elems $ monkeys
+  let top2 = take 2 . sortOn negate . map numProcessed . elems $ monkeys
   in foldl1 (*) top2
 
 round :: Array MonkeyIx Monkey -> Array MonkeyIx Monkey
 round monkeys =
-  foldl takeTurn monkeys [(fst . bounds $ monkeys)..(snd . bounds $ monkeys)]
+  let (firstMonkeyIx, lastMonkeyIx) = bounds monkeys
+  in foldl takeTurn monkeys [firstMonkeyIx..lastMonkeyIx]
 
 takeTurn :: Array MonkeyIx Monkey -> MonkeyIx -> Array MonkeyIx Monkey
 takeTurn monkeys monkeyIndex =
   let
     monkey = monkeys ! monkeyIndex
-    itemsToProcess = drop (itemCursor monkey) $ items monkey
-    updatedMs = foldl (processItem monkey) monkeys itemsToProcess
-  in updatedMs // [(monkeyIndex, (monkey { itemCursor = itemCursor monkey + length itemsToProcess}))]
+    itemsToProcess = items monkey
+    updatedMs = foldl (processItem (\x -> div x 3) monkey) monkeys itemsToProcess
+  in updatedMs // [(monkeyIndex, (monkey { numProcessed = numProcessed monkey + toEnum (length itemsToProcess), items = []}))]
 
-processItem :: Monkey -> Array MonkeyIx Monkey -> Item -> Array MonkeyIx Monkey
-processItem monkey monkeys item =
-  let newWorry = (operation monkey) item
-      postInspection = newWorry `div` 3
+processItem :: (Item -> Item) -> Monkey -> Array MonkeyIx Monkey -> Item -> Array MonkeyIx Monkey
+processItem worryOp monkey monkeys item =
+  let newWorry = applyOperation item (operation monkey)
+      postInspection = worryOp newWorry
       recipient = if (test monkey) postInspection then (ifTrue monkey) else (ifFalse monkey)
   in accum addItem monkeys [(recipient, postInspection)]
 
@@ -62,11 +73,23 @@ addItem monkey item =
   -- Yes, it pains me to use @++@
   monkey { items = (items monkey) ++ [item] }
 
--- Parser -- A particularly fun one today!
+applyOperation :: Item -> Expression -> Item
+applyOperation _item (Expression (Val a) op (Val b)) = (toFun op) a b
+applyOperation item  (Expression (Val a) op Old)     = (toFun op) a item
+applyOperation item  (Expression Old     op (Val b)) = (toFun op) item b
+applyOperation item  (Expression Old     op Old)     = (toFun op) item item
 
-data Operand
-  = Old
-  | Val Int
+toFun :: Operation -> (Item -> Item -> Item)
+toFun Add = (+)
+toFun Mul = (*)
+
+primeFactors :: Int -> [Int]
+primeFactors 1 = []
+primeFactors x =
+  let fac = fromJust $ find (\i -> x `rem` i == 0) [2..x]
+  in fac:(primeFactors (x `div` fac))
+
+-- Parser -- A particularly fun one today!
 
 parseFile :: Parser [Monkey]
 parseFile = do
@@ -93,27 +116,21 @@ parseItems = do
   _ <- char '\n'
   return (map read itemValues)
 
-parseOperation :: Parser (Int -> Int)
+parseOperation :: Parser Expression
 parseOperation = do
   _ <- string "  Operation: new = "
   e <- parseExp
   _ <- char '\n'
   return e
 
-parseExp :: Parser (Int -> Int)
+parseExp :: Parser Expression
 parseExp = do
   a <- parseOperand
   _ <- char ' '
   op <- parseOp
   _ <- char ' '
   b <- parseOperand
-  return (toFun a (op) b)
-
-toFun :: Operand -> (Int -> Int -> Int) -> Operand -> (Int -> Int)
-toFun Old     op Old     = (\x -> op x x)
-toFun Old     op (Val a) = (\x -> op x a)
-toFun (Val a) op Old     = (\x -> op a x)
-toFun (Val a) op (Val b) = (\_ -> op a b)
+  return (Expression a op b)
 
 parseOperand :: Parser Operand
 parseOperand = parseOld <|> parseVal
@@ -124,14 +141,14 @@ parseOld = (Old) <$ string "old"
 parseVal :: Parser Operand
 parseVal = fmap (Val . read) $ many1 digit
 
-parseOp :: Parser (Int -> Int -> Int)
+parseOp :: Parser Operation
 parseOp = parseAdd <|> parseMul
 
-parseAdd :: Parser (Int -> Int -> Int)
-parseAdd = (+) <$ char '+'
+parseAdd :: Parser Operation
+parseAdd = Add <$ char '+'
 
-parseMul :: Parser (Int -> Int -> Int)
-parseMul = (*) <$ char '*'
+parseMul :: Parser Operation
+parseMul = Mul <$ char '*'
 
 parseMTest :: Parser (Int -> Bool)
 parseMTest = do
