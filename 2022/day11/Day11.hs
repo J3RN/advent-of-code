@@ -4,7 +4,8 @@ import Text.Parsec.String (Parser)
 import Text.Printf
 
 import Data.Array.IArray
-import Data.List (sortOn)
+import Data.List (find, sortOn)
+import Data.Maybe (fromJust)
 
 type MonkeyIx = Int
 type Item = Int
@@ -21,7 +22,7 @@ data Expression = Expression Operand Operation Operand
 
 data Monkey = Monkey { items :: [Item]
                      , operation :: Expression
-                     , test :: Item -> Bool
+                     , factor :: Int
                      , ifTrue :: MonkeyIx
                      , ifFalse :: MonkeyIx
                      , numProcessed :: Int
@@ -65,13 +66,16 @@ processItem :: (Item -> Item) -> Monkey -> Array MonkeyIx Monkey -> Item -> Arra
 processItem worryOp monkey monkeys item =
   let newWorry = applyOperation item (operation monkey)
       postInspection = worryOp newWorry
-      recipient = if (test monkey) postInspection then (ifTrue monkey) else (ifFalse monkey)
+      recipient = if test monkey postInspection then (ifTrue monkey) else (ifFalse monkey)
   in accum addItem monkeys [(recipient, postInspection)]
 
 addItem :: Monkey -> Item -> Monkey
 addItem monkey item =
   -- Yes, it pains me to use '++'
   monkey { items = (items monkey) ++ [item] }
+
+test :: Monkey -> Item -> Bool
+test monkey i = i `rem` (factor monkey) == 0
 
 applyOperation :: Item -> Expression -> Item
 applyOperation _item (Expression (Val a) op (Val b)) = (toFun op) a b
@@ -104,10 +108,10 @@ parseMonkey = do
   _ <- string ":\n"
   is <- parseItems
   op <- parseOperation
-  t <- parseMTest
+  f <- parseFactor
   it <- parseIfTrue
   if' <- parseIfFalse
-  return (Monkey is op t it if' 0)
+  return (Monkey is op f it if' 0)
 
 parseItems :: Parser [Int]
 parseItems = do
@@ -150,12 +154,12 @@ parseAdd = Add <$ char '+'
 parseMul :: Parser Operation
 parseMul = Mul <$ char '*'
 
-parseMTest :: Parser (Int -> Bool)
-parseMTest = do
+parseFactor :: Parser Int
+parseFactor = do
   _ <- string "  Test: divisible by "
   num <- many1 digit
   _ <- char '\n'
-  return (\x -> x `rem` (read num) == 0)
+  return (read num)
 
 parseIfTrue :: Parser MonkeyIx
 parseIfTrue = do
