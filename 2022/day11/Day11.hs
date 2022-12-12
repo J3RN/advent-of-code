@@ -7,10 +7,11 @@ import Data.Array.IArray
 import Data.List (sortOn)
 
 type MonkeyIx = Int
+type Item = Int
 
-data Monkey = Monkey { items :: [Int]
-                     , operation :: Int -> Int
-                     , test :: Int -> Bool
+data Monkey = Monkey { items :: [Item]
+                     , operation :: Item -> Item
+                     , test :: Item -> Bool
                      , ifTrue :: MonkeyIx
                      , ifFalse :: MonkeyIx
                      , itemCursor :: Int
@@ -49,14 +50,14 @@ takeTurn monkeys monkeyIndex =
     updatedMs = foldl (processItem monkey) monkeys itemsToProcess
   in updatedMs // [(monkeyIndex, (monkey { itemCursor = itemCursor monkey + length itemsToProcess}))]
 
-processItem :: Monkey -> Array MonkeyIx Monkey -> Int -> Array MonkeyIx Monkey
+processItem :: Monkey -> Array MonkeyIx Monkey -> Item -> Array MonkeyIx Monkey
 processItem monkey monkeys item =
   let newWorry = (operation monkey) item
       postInspection = newWorry `div` 3
       recipient = if (test monkey) postInspection then (ifTrue monkey) else (ifFalse monkey)
   in accum addItem monkeys [(recipient, postInspection)]
 
-addItem :: Monkey -> Int -> Monkey
+addItem :: Monkey -> Item -> Monkey
 addItem monkey item =
   -- Yes, it pains me to use @++@
   monkey { items = (items monkey) ++ [item] }
