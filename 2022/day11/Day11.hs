@@ -6,11 +6,13 @@ import Text.Printf
 import Data.Array.IArray
 import Data.List (sortOn)
 
+type MonkeyIx = Int
+
 data Monkey = Monkey { items :: [Int]
                      , operation :: Int -> Int
                      , test :: Int -> Bool
-                     , ifTrue :: Int
-                     , ifFalse :: Int
+                     , ifTrue :: MonkeyIx
+                     , ifFalse :: MonkeyIx
                      , itemCursor :: Int
                      }
 
@@ -30,16 +32,16 @@ nTimes :: Int -> (a -> a) -> a -> a
 nTimes 0 _fun a = a
 nTimes n fun a = nTimes (n - 1) fun (fun a)
 
-monkeyBusiness :: Array Int Monkey -> Int
+monkeyBusiness :: Array MonkeyIx Monkey -> Int
 monkeyBusiness monkeys =
   let top2 = take 2 . sortOn negate . map itemCursor . elems $ monkeys
   in foldl1 (*) top2
 
-round :: Array Int Monkey -> Array Int Monkey
+round :: Array MonkeyIx Monkey -> Array MonkeyIx Monkey
 round monkeys =
   foldl takeTurn monkeys [(fst . bounds $ monkeys)..(snd . bounds $ monkeys)]
 
-takeTurn :: Array Int Monkey -> Int -> Array Int Monkey
+takeTurn :: Array MonkeyIx Monkey -> MonkeyIx -> Array MonkeyIx Monkey
 takeTurn monkeys monkeyIndex =
   let
     monkey = monkeys ! monkeyIndex
@@ -47,7 +49,7 @@ takeTurn monkeys monkeyIndex =
     updatedMs = foldl (processItem monkey) monkeys itemsToProcess
   in updatedMs // [(monkeyIndex, (monkey { itemCursor = itemCursor monkey + length itemsToProcess}))]
 
-processItem :: Monkey -> Array Int Monkey -> Int -> Array Int Monkey
+processItem :: Monkey -> Array MonkeyIx Monkey -> Int -> Array MonkeyIx Monkey
 processItem monkey monkeys item =
   let newWorry = (operation monkey) item
       postInspection = newWorry `div` 3
@@ -141,14 +143,14 @@ parseMTest = do
   _ <- char '\n'
   return (\x -> x `rem` (read num) == 0)
 
-parseIfTrue :: Parser Int
+parseIfTrue :: Parser MonkeyIx
 parseIfTrue = do
   _ <- string "    If true: throw to monkey "
   num <- many1 digit
   _ <- char '\n'
   return (read num)
 
-parseIfFalse :: Parser Int
+parseIfFalse :: Parser MonkeyIx
 parseIfFalse = do
   _ <- string "    If false: throw to monkey "
   num <- many1 digit
