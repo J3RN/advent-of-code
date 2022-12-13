@@ -1,5 +1,5 @@
 import Data.Array.IArray
-import Data.List (find)
+import Data.List (find, singleton)
 import Data.Maybe (fromJust)
 
 import Text.Printf (printf)
@@ -20,6 +20,8 @@ main = do
   matrix <- fmap parseFile $ readFile "input"
   path <- maybe (fail "No paths found!") pure $ pathFrom matrix [[startPos matrix]] (targetPos matrix)
   printf "Shortest number of steps: %d\n" . length $ path
+  shortestPath <- maybe (fail "No paths found!") pure $ pathFrom matrix ((map singleton) (startPos' matrix)) (targetPos matrix)
+  printf "Shortest path from any 'a': %d\n" . length $ shortestPath
 
 -- No Parsec today, would be overkill
 parseFile :: String -> Matrix
@@ -59,6 +61,10 @@ markVisited matrix pos =
 startPos :: Matrix -> Pos
 startPos matrix =
   fromJust . findPos ((==) 'S' . height) $ matrix
+
+startPos' :: Matrix -> [Pos]
+startPos' matrix =
+  map fst . filter (\p -> (height . snd $ p) `elem` ['S', 'a']) . assocs $ matrix
 
 targetPos :: Matrix -> Pos
 targetPos matrix =
