@@ -1,6 +1,6 @@
 import Data.Array.IArray
 import Data.List (find)
-import Data.Maybe (catMaybes, fromJust)
+import Data.Maybe (fromJust)
 
 import Text.Printf (printf)
 
@@ -18,8 +18,8 @@ type Matrix = Array Pos Cell
 main :: IO ()
 main = do
   matrix <- fmap parseFile $ readFile "input"
-  paths <- maybe (fail "No paths found!") pure $ pathsFrom matrix (startPos matrix) (targetPos matrix)
-  printf "Shortest number of steps: %d\n" . minimum . map length $ paths
+  path <- maybe (fail "No paths found!") pure $ pathFrom matrix [[startPos matrix]] (targetPos matrix)
+  printf "Shortest number of steps: %d\n" . length $ path
 
 -- No Parsec today, would be overkill
 parseFile :: String -> Matrix
@@ -29,16 +29,32 @@ parseFile file =
   -- Again, sorry I'm using '++'
   in listArray ((1, 1), dims) . map (Cell False) $ foldl1 (++) inputLines
 
-pathsFrom :: Matrix -> Pos -> Pos -> Maybe [Path]
-pathsFrom matrix start end
-  | start == end = Just [[]]
-  | otherwise =
-    let visitedMatrix = matrix // [(start, (matrix ! start) { visited = True })]
-        myCandidates = map fst . candidates visitedMatrix $ start
-        subpaths = concat . catMaybes . map (\newStart -> pathsFrom visitedMatrix newStart end) $ myCandidates
-    in case subpaths of
-      [] -> Nothing
-      paths -> Just (map (\p -> start:p) paths)
+pathFrom :: Matrix -> [Path] -> Pos -> Maybe Path
+pathFrom matrix paths end =
+  let (updatedMatrix, newPaths) = foldl progress (matrix, []) paths
+  in case find ((==) end . head) newPaths of
+    Just (_end:path) -> Just path
+    Nothing          -> pathFrom updatedMatrix newPaths end
+    -- I don't like exhaustiveness some days
+    -- Usually that means there's a better way to write something, but 🤷
+    Just []          -> Just []
+
+-- Terrible name, I know, but it used to be named 'foobar' so give me some
+-- credit.  'progress' finds the new candidates for the next iteration and marks
+-- them as visited in the matrix.  The reason this is done in one function
+-- instead of two is that the candidates are marked in the matrix as they're
+-- discovered such that the next iteration won't enqueue the same cells.
+progress :: (Matrix, [Path]) -> Path -> (Matrix, [Path])
+progress (matrix, newPaths) path =
+  let myCandidates = map fst $ candidates matrix (head path)
+      updatedMatrix = foldl (markVisited) matrix myCandidates
+      myNewPaths = map (\c -> c:path) myCandidates
+  in (updatedMatrix, myNewPaths ++ newPaths)
+
+markVisited :: Matrix -> Pos -> Matrix
+markVisited matrix pos =
+  let oldVal = matrix ! pos
+  in matrix // [(pos, oldVal {visited = True})]
 
 startPos :: Matrix -> Pos
 startPos matrix =
