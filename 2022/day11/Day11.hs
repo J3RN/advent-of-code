@@ -4,26 +4,25 @@ import Text.Parsec.String (Parser)
 import Text.Printf
 
 import Data.Array.IArray
-import Data.List (singleton, sortOn)
+import Data.List (find, sortOn)
+import Data.Maybe (fromJust)
 
 type MonkeyIx = Int
+type Item = Int
 
 data Operand
   = Old
-  | Val Integer
-  deriving Show
+  | Val Int
 
 data Operation
   = Add
   | Mul
-  deriving Show
 
-data Expression = Expression Operation Operand deriving Show
-type Item = [Expression]
+data Expression = Expression Operand Operation Operand
 
 data Monkey = Monkey { items :: [Item]
                      , operation :: Expression
-                     , factor :: Integer
+                     , factor :: Int
                      , ifTrue :: MonkeyIx
                      , ifFalse :: MonkeyIx
                      , numProcessed :: Int
@@ -37,9 +36,11 @@ main = do
   contents <- readFile "input"
   monkeyList <- either (fail . show) pure $ runParser parseFile () "input" contents
   let monkeys = listArray (0, (length monkeyList - 1)) monkeyList
-      afterMonkeys = nTimes 1000 Main.round $ monkeys
-  putStrLn (show afterMonkeys)
-  printf "Monkey business after 1000: %d\n" (monkeyBusiness afterMonkeys)
+      mb = monkeyBusiness . nTimes 20 (Main.round takeTurn) $ monkeys
+  printf "Monkey business after 20: %d\n" mb
+  let godMod = foldl1 (*) $ amap factor monkeys
+      mb' = monkeyBusiness . nTimes 10000 (Main.round (takeTurn' godMod)) $ monkeys
+  printf "Monkey business after 10000: %d\n" mb'
 
 -- Known as 'iterate'' in Agda
 nTimes :: Int -> (a -> a) -> a -> a
@@ -51,24 +52,33 @@ monkeyBusiness monkeys =
   let top2 = take 2 . sortOn negate . map numProcessed . elems $ monkeys
   in foldl1 (*) top2
 
-round :: Array MonkeyIx Monkey -> Array MonkeyIx Monkey
-round monkeys =
+round :: (Array MonkeyIx Monkey -> MonkeyIx -> Array MonkeyIx Monkey) -> Array MonkeyIx Monkey -> Array MonkeyIx Monkey
+round turnFun monkeys =
   let (firstMonkeyIx, lastMonkeyIx) = bounds monkeys
-  in foldl takeTurn monkeys [firstMonkeyIx..lastMonkeyIx]
+  in foldl turnFun monkeys [firstMonkeyIx..lastMonkeyIx]
 
 takeTurn :: Array MonkeyIx Monkey -> MonkeyIx -> Array MonkeyIx Monkey
 takeTurn monkeys monkeyIndex =
   let
     monkey = monkeys ! monkeyIndex
     itemsToProcess = items monkey
-    updatedMs = foldl (processItem monkey) monkeys itemsToProcess
+    updatedMs = foldl (processItem (\x -> div x 3) monkey) monkeys itemsToProcess
   in updatedMs // [(monkeyIndex, (monkey { numProcessed = numProcessed monkey + toEnum (length itemsToProcess), items = []}))]
 
-processItem :: Monkey -> Array MonkeyIx Monkey -> Item -> Array MonkeyIx Monkey
-processItem monkey monkeys item =
+takeTurn' :: Int -> Array MonkeyIx Monkey -> MonkeyIx -> Array MonkeyIx Monkey
+takeTurn' godMod monkeys monkeyIndex =
+  let
+    monkey = monkeys ! monkeyIndex
+    itemsToProcess = items monkey
+    updatedMs = foldl (processItem (\x -> x `mod` godMod) monkey) monkeys itemsToProcess
+  in updatedMs // [(monkeyIndex, (monkey { numProcessed = numProcessed monkey + toEnum (length itemsToProcess), items = []}))]
+
+processItem :: (Item -> Item) -> Monkey -> Array MonkeyIx Monkey -> Item -> Array MonkeyIx Monkey
+processItem worryOp monkey monkeys item =
   let newWorry = applyOperation item (operation monkey)
-      recipient = if test monkey newWorry then (ifTrue monkey) else (ifFalse monkey)
-  in accum addItem monkeys [(recipient, newWorry)]
+      postInspection = worryOp newWorry
+      recipient = if test monkey postInspection then (ifTrue monkey) else (ifFalse monkey)
+  in accum addItem monkeys [(recipient, postInspection)]
 
 addItem :: Monkey -> Item -> Monkey
 addItem monkey item =
@@ -76,21 +86,17 @@ addItem monkey item =
   monkey { items = (items monkey) ++ [item] }
 
 test :: Monkey -> Item -> Bool
-test monkey i = (expand i) `rem` (factor monkey) == 0
-
-expand :: Item -> Integer
-expand i = foldr expandOp 1 i
-
-expandOp :: Expression -> Integer -> Integer
-expandOp (Expression Add (Val b)) a = a + b
-expandOp (Expression Add Old)     a = a + a
-expandOp (Expression Mul (Val b)) a = a * b
-expandOp (Expression Mul Old)     a = a * a
+test monkey i = i `rem` (factor monkey) == 0
 
 applyOperation :: Item -> Expression -> Item
-applyOperation ((Expression Add (Val a)):rest) (Expression Add (Val b)) = (Expression Add (Val (a + b))):rest
-applyOperation ((Expression Mul (Val a)):rest) (Expression Mul (Val b)) = (Expression Mul (Val (a * b))):rest
-applyOperation item                            e                        = e:item
+applyOperation _item (Expression (Val a) op (Val b)) = (toFun op) a b
+applyOperation item  (Expression (Val a) op Old)     = (toFun op) a item
+applyOperation item  (Expression Old     op (Val b)) = (toFun op) item b
+applyOperation item  (Expression Old     op Old)     = (toFun op) item item
+
+toFun :: Operation -> (Item -> Item -> Item)
+toFun Add = (+)
+toFun Mul = (*)
 
 -- Parser -- A particularly fun one today!
 
@@ -112,12 +118,12 @@ parseMonkey = do
   if' <- parseIfFalse
   return (Monkey is op f it if' 0)
 
-parseItems :: Parser [Item]
+parseItems :: Parser [Int]
 parseItems = do
   _ <- string "  Starting items: "
   itemValues <- sepBy (many1 digit) (string ", ")
   _ <- char '\n'
-  return (map (singleton . Expression Mul . Val . read) itemValues)
+  return (map read itemValues)
 
 parseOperation :: Parser Expression
 parseOperation = do
@@ -128,11 +134,12 @@ parseOperation = do
 
 parseExp :: Parser Expression
 parseExp = do
-  _ <- string "old "
+  a <- parseOperand
+  _ <- char ' '
   op <- parseOp
   _ <- char ' '
   b <- parseOperand
-  return (Expression op b)
+  return (Expression a op b)
 
 parseOperand :: Parser Operand
 parseOperand = parseOld <|> parseVal
@@ -152,7 +159,7 @@ parseAdd = Add <$ char '+'
 parseMul :: Parser Operation
 parseMul = Mul <$ char '*'
 
-parseFactor :: Parser Integer
+parseFactor :: Parser Int
 parseFactor = do
   _ <- string "  Test: divisible by "
   num <- many1 digit
