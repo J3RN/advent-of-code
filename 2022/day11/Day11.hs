@@ -36,10 +36,10 @@ main = do
   contents <- readFile "input"
   monkeyList <- either (fail . show) pure $ runParser parseFile () "input" contents
   let monkeys = listArray (0, (length monkeyList - 1)) monkeyList
-      mb = monkeyBusiness . nTimes 20 (Main.round takeTurn) $ monkeys
+      mb = monkeyBusiness . nTimes 20 (Main.round (takeTurn (`div` 3))) $ monkeys
   printf "Monkey business after 20: %d\n" mb
   let godMod = foldl1 (*) $ amap factor monkeys
-      mb' = monkeyBusiness . nTimes 10000 (Main.round (takeTurn' godMod)) $ monkeys
+      mb' = monkeyBusiness . nTimes 10000 (Main.round (takeTurn (`rem` godMod))) $ monkeys
   printf "Monkey business after 10000: %d\n" mb'
 
 -- Known as 'iterate'' in Agda
@@ -57,33 +57,23 @@ round turnFun monkeys =
   let (firstMonkeyIx, lastMonkeyIx) = bounds monkeys
   in foldl turnFun monkeys [firstMonkeyIx..lastMonkeyIx]
 
-takeTurn :: Array MonkeyIx Monkey -> MonkeyIx -> Array MonkeyIx Monkey
-takeTurn monkeys monkeyIndex =
-  let
-    monkey = monkeys ! monkeyIndex
-    itemsToProcess = items monkey
-    updatedMs = foldl (processItem (\x -> div x 3) monkey) monkeys itemsToProcess
+takeTurn :: (Item -> Item) -> Array MonkeyIx Monkey -> MonkeyIx -> Array MonkeyIx Monkey
+takeTurn worryOp monkeys monkeyIndex =
+  let monkey = monkeys ! monkeyIndex
+      itemsToProcess = items monkey
+      updatedMs = foldr (processItem worryOp monkey) monkeys itemsToProcess
   in updatedMs // [(monkeyIndex, (monkey { numProcessed = numProcessed monkey + toEnum (length itemsToProcess), items = []}))]
 
-takeTurn' :: Int -> Array MonkeyIx Monkey -> MonkeyIx -> Array MonkeyIx Monkey
-takeTurn' godMod monkeys monkeyIndex =
-  let
-    monkey = monkeys ! monkeyIndex
-    itemsToProcess = items monkey
-    updatedMs = foldl (processItem (\x -> x `mod` godMod) monkey) monkeys itemsToProcess
-  in updatedMs // [(monkeyIndex, (monkey { numProcessed = numProcessed monkey + toEnum (length itemsToProcess), items = []}))]
-
-processItem :: (Item -> Item) -> Monkey -> Array MonkeyIx Monkey -> Item -> Array MonkeyIx Monkey
-processItem worryOp monkey monkeys item =
+processItem :: (Item -> Item) -> Monkey -> Item -> Array MonkeyIx Monkey -> Array MonkeyIx Monkey
+processItem worryOp monkey item monkeys =
   let newWorry = applyOperation item (operation monkey)
       postInspection = worryOp newWorry
-      recipient = if test monkey postInspection then (ifTrue monkey) else (ifFalse monkey)
+      recipient = if test monkey postInspection then ifTrue monkey else ifFalse monkey
   in accum addItem monkeys [(recipient, postInspection)]
 
 addItem :: Monkey -> Item -> Monkey
-addItem monkey item =
-  -- Yes, it pains me to use '++'
-  monkey { items = (items monkey) ++ [item] }
+addItem monkey@(Monkey {items = is}) item =
+  monkey { items = item:is }
 
 test :: Monkey -> Item -> Bool
 test monkey i = i `rem` (factor monkey) == 0
