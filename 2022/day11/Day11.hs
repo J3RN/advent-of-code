@@ -4,25 +4,26 @@ import Text.Parsec.String (Parser)
 import Text.Printf
 
 import Data.Array.IArray
-import Data.List (find, sortOn)
-import Data.Maybe (fromJust)
+import Data.List (singleton, sortOn)
 
 type MonkeyIx = Int
-type Item = Int
 
 data Operand
   = Old
-  | Val Int
+  | Val Integer
+  deriving Show
 
 data Operation
   = Add
   | Mul
+  deriving Show
 
-data Expression = Expression Operand Operation Operand
+data Expression = Expression Operation Operand deriving Show
+type Item = [Expression]
 
 data Monkey = Monkey { items :: [Item]
                      , operation :: Expression
-                     , factor :: Int
+                     , factor :: Integer
                      , ifTrue :: MonkeyIx
                      , ifFalse :: MonkeyIx
                      , numProcessed :: Int
@@ -36,8 +37,9 @@ main = do
   contents <- readFile "input"
   monkeyList <- either (fail . show) pure $ runParser parseFile () "input" contents
   let monkeys = listArray (0, (length monkeyList - 1)) monkeyList
-      mb = monkeyBusiness . nTimes 20 Main.round $ monkeys
-  printf "Monkey business after 20: %d\n" mb
+      afterMonkeys = nTimes 1000 Main.round $ monkeys
+  putStrLn (show afterMonkeys)
+  printf "Monkey business after 1000: %d\n" (monkeyBusiness afterMonkeys)
 
 -- Known as 'iterate'' in Agda
 nTimes :: Int -> (a -> a) -> a -> a
@@ -59,15 +61,14 @@ takeTurn monkeys monkeyIndex =
   let
     monkey = monkeys ! monkeyIndex
     itemsToProcess = items monkey
-    updatedMs = foldl (processItem (\x -> div x 3) monkey) monkeys itemsToProcess
+    updatedMs = foldl (processItem monkey) monkeys itemsToProcess
   in updatedMs // [(monkeyIndex, (monkey { numProcessed = numProcessed monkey + toEnum (length itemsToProcess), items = []}))]
 
-processItem :: (Item -> Item) -> Monkey -> Array MonkeyIx Monkey -> Item -> Array MonkeyIx Monkey
-processItem worryOp monkey monkeys item =
+processItem :: Monkey -> Array MonkeyIx Monkey -> Item -> Array MonkeyIx Monkey
+processItem monkey monkeys item =
   let newWorry = applyOperation item (operation monkey)
-      postInspection = worryOp newWorry
-      recipient = if test monkey postInspection then (ifTrue monkey) else (ifFalse monkey)
-  in accum addItem monkeys [(recipient, postInspection)]
+      recipient = if test monkey newWorry then (ifTrue monkey) else (ifFalse monkey)
+  in accum addItem monkeys [(recipient, newWorry)]
 
 addItem :: Monkey -> Item -> Monkey
 addItem monkey item =
@@ -75,23 +76,21 @@ addItem monkey item =
   monkey { items = (items monkey) ++ [item] }
 
 test :: Monkey -> Item -> Bool
-test monkey i = i `rem` (factor monkey) == 0
+test monkey i = (expand i) `rem` (factor monkey) == 0
+
+expand :: Item -> Integer
+expand i = foldr expandOp 1 i
+
+expandOp :: Expression -> Integer -> Integer
+expandOp (Expression Add (Val b)) a = a + b
+expandOp (Expression Add Old)     a = a + a
+expandOp (Expression Mul (Val b)) a = a * b
+expandOp (Expression Mul Old)     a = a * a
 
 applyOperation :: Item -> Expression -> Item
-applyOperation _item (Expression (Val a) op (Val b)) = (toFun op) a b
-applyOperation item  (Expression (Val a) op Old)     = (toFun op) a item
-applyOperation item  (Expression Old     op (Val b)) = (toFun op) item b
-applyOperation item  (Expression Old     op Old)     = (toFun op) item item
-
-toFun :: Operation -> (Item -> Item -> Item)
-toFun Add = (+)
-toFun Mul = (*)
-
-primeFactors :: Int -> [Int]
-primeFactors 1 = []
-primeFactors x =
-  let fac = fromJust $ find (\i -> x `rem` i == 0) [2..x]
-  in fac:(primeFactors (x `div` fac))
+applyOperation ((Expression Add (Val a)):rest) (Expression Add (Val b)) = (Expression Add (Val (a + b))):rest
+applyOperation ((Expression Mul (Val a)):rest) (Expression Mul (Val b)) = (Expression Mul (Val (a * b))):rest
+applyOperation item                            e                        = e:item
 
 -- Parser -- A particularly fun one today!
 
@@ -113,12 +112,12 @@ parseMonkey = do
   if' <- parseIfFalse
   return (Monkey is op f it if' 0)
 
-parseItems :: Parser [Int]
+parseItems :: Parser [Item]
 parseItems = do
   _ <- string "  Starting items: "
   itemValues <- sepBy (many1 digit) (string ", ")
   _ <- char '\n'
-  return (map read itemValues)
+  return (map (singleton . Expression Mul . Val . read) itemValues)
 
 parseOperation :: Parser Expression
 parseOperation = do
@@ -129,12 +128,11 @@ parseOperation = do
 
 parseExp :: Parser Expression
 parseExp = do
-  a <- parseOperand
-  _ <- char ' '
+  _ <- string "old "
   op <- parseOp
   _ <- char ' '
   b <- parseOperand
-  return (Expression a op b)
+  return (Expression op b)
 
 parseOperand :: Parser Operand
 parseOperand = parseOld <|> parseVal
@@ -154,7 +152,7 @@ parseAdd = Add <$ char '+'
 parseMul :: Parser Operation
 parseMul = Mul <$ char '*'
 
-parseFactor :: Parser Int
+parseFactor :: Parser Integer
 parseFactor = do
   _ <- string "  Test: divisible by "
   num <- many1 digit
