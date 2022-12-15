@@ -24,19 +24,21 @@
 -- Part2 Follow-up: Well, Part 2 takes about 2.2 seconds to run, which sucks
 -- quite frankly.  I'm going to break out the profiler and see what I can do.
 
+-- Part duex: It's `sandNextPos`, probably `Set.notMember`.
+
 import Text.Parsec
 import Text.Parsec.String (Parser)
 
 import Text.Printf (printf)
 
-import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as Set
 
 type Pos = (Int, Int)
 type Path = [Pos]
 type Line = (Pos, Pos)
 -- It only occurred to me much later how this is confusing
-type Map = Set Pos
+type Map = IntSet
 
 main :: IO ()
 main = do
@@ -68,7 +70,7 @@ insertLine m line =
   foldl insertPoint m (generatePoints line)
 
 insertPoint :: Map -> Pos -> Map
-insertPoint m pos = Set.insert pos m
+insertPoint m pos = Set.insert (hash pos) m
 
 pairs :: [a] -> [(a, a)]
 pairs l = zip (drop 1 l) l
@@ -80,28 +82,46 @@ generatePoints ((x1, y1), (x2, y2))
 
 maxDepth :: Map -> Int
 maxDepth m =
-  maximum . map snd . Set.elems $ m
+  maximum . map (snd . unhash) . Set.elems $ m
 
 dropSand :: Int -> Pos -> Map -> Map
 dropSand maxD oldPos m
-  | nextPos == oldPos  = Set.insert oldPos m
+  | nextPos == oldPos  = Set.insert (hash oldPos) m
   | snd nextPos > maxD = m
   | otherwise          = dropSand maxD nextPos m
   where nextPos = sandNextPos m oldPos
 
 dropSand' :: Int -> Pos -> Map -> Map
 dropSand' maxD oldPos m
-  | nextPos == oldPos       = Set.insert oldPos m
-  | snd nextPos == maxD + 1 = Set.insert nextPos m
+  | nextPos == oldPos       = Set.insert (hash oldPos) m
+  | snd nextPos == maxD + 1 = Set.insert (hash nextPos) m
   | otherwise               = dropSand' maxD nextPos m
   where nextPos = sandNextPos m oldPos
 
 sandNextPos :: Map -> Pos -> Pos
 sandNextPos m oldPos@(x, y)
-  | (x,     y + 1) `Set.notMember` m = (x,     y + 1)
-  | (x - 1, y + 1) `Set.notMember` m = (x - 1, y + 1)
-  | (x + 1, y + 1) `Set.notMember` m = (x + 1, y + 1)
+  | hash (x,     y + 1) `Set.notMember` m = (x,     y + 1)
+  | hash (x - 1, y + 1) `Set.notMember` m = (x - 1, y + 1)
+  | hash (x + 1, y + 1) `Set.notMember` m = (x + 1, y + 1)
   | otherwise                        = oldPos
+
+-- Ah, a homebrewed hashing function!
+-- Yeah yeah, the idea here is to create a unique integers from pairs.  This
+-- uses Cantor's enumeration of pairs.
+
+hash :: Pos -> Int
+hash (x, y) =
+  let s = (x + y)
+  in ((s * (s + 1)) `div` 2) + y
+
+-- Well, this hash is reversible which is fine for this usecase
+
+unhash :: Int -> Pos
+unhash z =
+  let w = floor ((sqrt(8 * (toEnum z :: Double) + 1) - 1) / 2)
+      t = (w * w + w) `div` 2
+      y = z - t
+  in (w - y, y)
 
 -- Parser
 
