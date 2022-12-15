@@ -17,6 +17,13 @@
 -- In summary, I'm starting with Option 1 and hopefully it won't bite me (e.g.
 -- with really long paths).
 
+-- Part1 Follow-up: Seems reasonably performant.  Part 1 takes 0.044s to run
+-- which isn't _fast_, but is honestly faster than Emacs can render.  Also, I
+-- was wrong about diagonals!
+
+-- Part2 Follow-up: Well, Part 2 takes about 2.2 seconds to run, which sucks
+-- quite frankly.  I'm going to break out the profiler and see what I can do.
+
 import Text.Parsec
 import Text.Parsec.String (Parser)
 
@@ -36,8 +43,11 @@ main = do
   contents <- readFile "input"
   paths <- either (fail.show) pure $ runParser parseFile () "input" contents
   let m = buildMap paths
-      numSand = unitsOfSand (maxDepth m) dropSand m
+      maxD = maxDepth m
+      numSand = unitsOfSand maxD dropSand m
   printf "Units of sand: %d\n" numSand
+  let numSand' = unitsOfSand maxD dropSand' m
+  printf "Units of sand: %d\n" numSand'
 
 unitsOfSand :: Int -> (Int -> Pos -> Map -> Map) -> Map -> Int
 unitsOfSand maxD dropFun m
@@ -77,6 +87,13 @@ dropSand maxD oldPos m
   | nextPos == oldPos  = Set.insert oldPos m
   | snd nextPos > maxD = m
   | otherwise          = dropSand maxD nextPos m
+  where nextPos = sandNextPos m oldPos
+
+dropSand' :: Int -> Pos -> Map -> Map
+dropSand' maxD oldPos m
+  | nextPos == oldPos       = Set.insert oldPos m
+  | snd nextPos == maxD + 1 = Set.insert nextPos m
+  | otherwise               = dropSand' maxD nextPos m
   where nextPos = sandNextPos m oldPos
 
 sandNextPos :: Map -> Pos -> Pos
