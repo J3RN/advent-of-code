@@ -28,9 +28,9 @@ parseFile :: String -> Matrix
 parseFile file =
   let inputLines = lines file
       dims = (length inputLines, length . head $ inputLines)
-  -- Again, sorry I'm using '++'
-  in listArray ((1, 1), dims) . map (Cell False) $ foldl1 (++) inputLines
+  in listArray ((1, 1), dims) . map (Cell False) $ concat inputLines
 
+-- Good ole Breadth-First-Search (BFS)
 pathFrom :: Matrix -> [Path] -> Pos -> Maybe Path
 pathFrom matrix paths end =
   let (updatedMatrix, newPaths) = foldl progress (matrix, []) paths
