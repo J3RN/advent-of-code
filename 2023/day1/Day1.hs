@@ -1,4 +1,4 @@
-import Control.Applicative ((<|>), liftA2)
+import Control.Applicative ((<|>))
 
 import Data.List (isPrefixOf, tails)
 
@@ -21,9 +21,8 @@ digitsFromStr s =
             Just digit -> digit:acc
             Nothing -> acc
 
--- Implementation is admittedly a bit fancier than it needs to be
 parseDigit :: String -> Maybe Int
-parseDigit = liftA2 (<|>) parseLiteralDigit parseWordDigit
+parseDigit str = (parseLiteralDigit str) <|> (parseWordDigit str)
 
 parseLiteralDigit :: String -> Maybe Int
 parseLiteralDigit str
