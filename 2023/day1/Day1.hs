@@ -21,6 +21,7 @@ digitsFromStr s =
             Just digit -> digit:acc
             Nothing -> acc
 
+-- Implementation is admittedly a bit fancier than it needs to be
 parseDigit :: String -> Maybe Int
 parseDigit = liftA2 (<|>) parseLiteralDigit parseWordDigit
 
