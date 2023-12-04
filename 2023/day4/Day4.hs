@@ -1,4 +1,4 @@
-import Data.List (foldl', intersect)
+import Data.List (intersect)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -17,7 +17,7 @@ main = do
   let cardScores = map scoreCard cards
   print $ sum cardScores
   let initialSet = Map.fromList $ zipWith (\i c -> (i, (c, 1))) [1..] cards
-      processedSet = foldl' processCard initialSet [1..length cards]
+      processedSet = foldl processCard initialSet [1..length cards]
   print $ countCards processedSet
 
 countCards :: Map Int (Card, Int) -> Int
@@ -27,7 +27,7 @@ processCard :: Map Int (Card, Int) -> Int -> Map Int (Card, Int)
 processCard cardSet index =
   let (card, c) = cardSet Map.! index
       correct = numCorrect card
-      updatedSet = foldl' (updateCount c) cardSet [index + 1..index + correct]
+      updatedSet = foldl (updateCount c) cardSet [index + 1..index + correct]
   in updatedSet
   where updateCount amount cardSet' i = Map.update (\(card, c') -> Just (card, c' + amount)) i cardSet'
 
