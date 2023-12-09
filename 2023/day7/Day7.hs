@@ -64,17 +64,6 @@ groupings cards =
 transformJacks :: [Card] -> [Card]
 transformJacks = map (\c -> if c == Jack then Joker else c)
 
-toHand' :: [Card] -> Hand
-toHand' cards =
-  case groupings' cards of
-    [[_, _, _, _, _]]         -> FiveOf cards
-    [[_, _, _, _], [_]]       -> FourOf cards
-    [[_, _, _], [_, _]]       -> FullHouse cards
-    [[_, _, _], [_], [_]]     -> ThreeOf cards
-    [[_, _], [_, _], [_]]     -> TwoPair cards
-    [[_, _], [_], [_], [_]]   -> OnePair cards
-    [[_], [_], [_], [_], [_]] -> High cards
-
 groupings' :: [Card] -> [[Card]]
 groupings' cards =
   let (jokers, others) = partition (== Joker) cards
