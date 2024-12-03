@@ -17,7 +17,7 @@ main = do
   print (listSimilarity lists)
 
 listDifferences :: ([Int], [Int]) -> Int
-listDifferences = sum . uncurry (zipWith (\a b -> abs (a - b)) `on` List.sort)
+listDifferences = sum . uncurry (zipWith ((abs .) . (-)) `on` List.sort)
 
 listSimilarity :: ([Int], [Int]) -> Int
 listSimilarity (a, b) = sum $ map (itemScore b) a
