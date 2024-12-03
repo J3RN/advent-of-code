@@ -21,7 +21,7 @@ listDifferences = sum . uncurry (zipWith ((abs .) . (-)) `on` List.sort)
 
 listSimilarity :: ([Int], [Int]) -> Int
 listSimilarity (a, b) = sum $ map (itemScore b) a
- where itemScore l i = i * length (filter (== i) l)
+  where itemScore l i = i * length (filter (== i) l)
 
 parseFile :: Parsec Text () ([Int], [Int])
 parseFile = do
