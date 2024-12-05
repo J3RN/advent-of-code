@@ -1,5 +1,6 @@
-import           Data.Map (Map, (!?))
-import qualified Data.Map as Map
+import           Data.Bifunctor (first)
+import           Data.Map       (Map, (!?))
+import qualified Data.Map       as Map
 
 type Puzzle = Map (Int, Int) Char
 
@@ -11,9 +12,10 @@ main = do
 
 parseFile :: FilePath -> IO Puzzle
 parseFile fname = do
-  raw <- readFile fname
-  let rows = lines raw
-  return . Map.fromList . concatMap (\(row, rowIx) -> zipWith (\char colIx -> ((colIx, rowIx), char)) row [1..]) $ zip rows [1..]
+  rows <- lines <$> readFile fname
+  return . Map.fromList . concat $ zipWith indexCols [1..] rows
+  where
+    indexCols rowIx = zipWith (curry (first (,rowIx))) [1..]
 
 -- Return count of "XMAS" starting from given coord
 -- General approach: From each point, check all directions to see if it's "XMAS"
