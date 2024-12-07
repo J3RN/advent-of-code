@@ -9,25 +9,26 @@ import           Text.Parsec
 
 type Point = (Int, Int)
 
-data Direction = U | R | L | D
-  deriving (Show, Eq)
+data Direction = U | R | D | L
+  deriving (Show, Eq, Ord)
 
 main :: IO ()
 main = do
   (bounds, start, obstacles) <- parseFromFile parseFile "input" >>= either (fail . show) pure
-  -- print (bounds, start, obstacles)
-  print . length . nub $ path bounds start U obstacles
+  let p = path bounds start U obstacles
+  print . length $ p
 
-path :: (Int, Int) -> Point -> Direction -> Set Point -> [Point]
-path = path' []
 
-path' :: [Point] -> (Int, Int) -> Point -> Direction -> Set Point -> [Point]
+path :: (Int, Int) -> Point -> Direction -> Set Point -> Set Point
+path = path' Set.empty
+
+path' :: Set Point -> (Int, Int) -> Point -> Direction -> Set Point -> Set Point
 path' p dims@(width, height) pos dir obstacles
   | fst pos < 0 || snd pos < 0 || fst pos >= width || snd pos >= height = p
   | otherwise = let next = nextPos pos dir
                  in if next `Set.member` obstacles
                     then path' p dims pos (turn dir) obstacles
-                    else path' (pos:p) dims next dir obstacles
+                    else path' (Set.insert pos p) dims next dir obstacles
 
 nextPos :: Point -> Direction -> Point
 nextPos (x, y) U = (x, y - 1)
