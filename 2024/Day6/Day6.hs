@@ -17,6 +17,19 @@ main = do
   (bounds, start, obstacles) <- parseFromFile parseFile "input" >>= either (fail . show) pure
   let p = path bounds start U obstacles
   print . length $ p
+  print . length . Set.filter (isInfinitePath bounds start U . flip Set.insert obstacles) $ p
+
+isInfinitePath :: (Int, Int) -> Point -> Direction -> Set Point -> Bool
+isInfinitePath = isInfinitePath' Set.empty
+
+isInfinitePath' :: Set (Direction, Point) -> (Int, Int) -> Point -> Direction -> Set Point -> Bool
+isInfinitePath' p dims@(width, height) pos dir obstacles
+  | fst pos < 0 || snd pos < 0 || fst pos >= width || snd pos >= height = False
+  | (dir, pos) `Set.member` p = True
+  | otherwise = let next = nextPos pos dir
+                 in if next `Set.member` obstacles
+                    then isInfinitePath' (Set.insert (dir, pos) p) dims pos (turn dir) obstacles
+                    else isInfinitePath' (Set.insert (dir, pos) p) dims next dir obstacles
 
 
 path :: (Int, Int) -> Point -> Direction -> Set Point -> Set Point
