@@ -19,9 +19,9 @@ type Distance = (Int, Int)
 main :: IO ()
 main = do
   (bounds, antennas) <- parseFromFile parseFile "input" >>= either (fail.show) pure
-  let anntennaGroups = Map.fromListWith (++) $ map (second List.singleton) antennas
-      antinodeLocs = filter (isInsideBounds bounds) . List.nub . concatMap (antinodes . snd) $ Map.toList anntennaGroups
-  print . length $ antinodeLocs
+  let anntennaGroups = Map.toList . Map.fromListWith (++) $ map (second List.singleton) antennas
+  print . length . filter (isInsideBounds bounds) . List.nub . concatMap (antinodes . snd) $ anntennaGroups
+  print . length . List.nub . concatMap (harmonicAntinodes bounds . snd) $ anntennaGroups
 
 isInsideBounds :: Bounds -> Point -> Bool
 isInsideBounds (maxX, maxY) (x, y) = x >= 0 && y >= 0 && x < maxX && y < maxY
@@ -34,6 +34,16 @@ antinodes' :: Point -> Point -> [Point]
 antinodes' point1 point2 =
   let (δx, δy) = distance point1 point2
   in [translate point1 (-δx, -δy), translate point2 (δx, δy)]
+
+harmonicAntinodes :: Bounds -> [Point] -> [Point]
+harmonicAntinodes bounds antennas = concatMap (uncurry (harmonicAntinodes' bounds)) antennaPairs
+  where antennaPairs = combinations antennas
+
+harmonicAntinodes' :: Bounds -> Point -> Point -> [Point]
+harmonicAntinodes' bounds point1 point2 =
+  let (δx, δy) = distance point1 point2
+  in point1:(takeWhile (isInsideBounds bounds) (iterate (translate (δx, δy)) point1)
+             ++ takeWhile (isInsideBounds bounds) (iterate (translate (-δx, -δy)) point1))
 
 distance :: Point -> Point -> Distance
 distance (x1, y1) (x2, y2) = (x2 - x1, y2 - y1)
