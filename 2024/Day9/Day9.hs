@@ -1,6 +1,6 @@
 import           Data.Array     (Array, (!), (//))
 import qualified Data.Array     as Array
-import           Data.Bifunctor (second)
+import           Data.Bifunctor (bimap, second)
 import qualified Data.List      as List
 import           Data.Maybe     (isJust)
 import           Data.Text      (Text)
@@ -55,21 +55,17 @@ contiguousCompact' sectors rPtr = case sectors ! rPtr of
                                                          Just ix -> contiguousCompact' (sectors // updates sectors ix (rPtr' + 1) blockSize) rPtr'
                                                          Nothing -> contiguousCompact' sectors rPtr'
   where findBlockSize :: Array Int (Maybe NodeId) -> Int -> Integer -> (Int, Int)
-        findBlockSize sectors rPtr' nodeId = if rPtr' == 0 || sectors ! rPtr' /= Just nodeId
-                                             then (rPtr', 0)
-                                             else second (+ 1) (findBlockSize sectors (rPtr' - 1) nodeId)
+        findBlockSize sectors rPtr' nodeId = until (\(ix, _) -> ix == 0 || (sectors ! ix /= Just nodeId)) (bimap pred succ) (rPtr', 0)
         findEmptySlot :: Array Int (Maybe NodeId) -> Int -> Int -> Maybe Int
         findEmptySlot sectors blockSize maxIx = fst <$> List.find ((>= blockSize) . snd) (emptySlots sectors 0 maxIx)
         emptySlots :: Array Int (Maybe NodeId) -> Int -> Int -> [(Int, Int)]
         emptySlots sectors ix maxIx | ix >= maxIx = []
         emptySlots sectors ix maxIx               = case sectors ! ix of
-                                                      Just _ -> emptySlots sectors (ix + 1) maxIx
+                                                      Just _  -> emptySlots sectors (ix + 1) maxIx
                                                       Nothing -> let end = until (\ix' -> ix' > maxIx || isJust (sectors ! ix')) (+ 1) ix
                                                                   in (ix, end - ix):emptySlots sectors end maxIx
         updates :: Array Int (Maybe NodeId) -> Int -> Int -> Int -> [(Int, Maybe NodeId)]
-        updates _ _ _ 0 = []
-        updates sectors emptyStart fileStart fileSize =
-          [(emptyStart, sectors ! fileStart), (fileStart, Nothing)] ++ updates sectors (emptyStart + 1) (fileStart + 1) (fileSize - 1)
+        updates sectors emptyStart fileStart fileSize = concat $ zipWith (\e f -> [(e, sectors ! f), (f, Nothing)]) [emptyStart..] [fileStart..(fileStart + fileSize - 1)]
 
 -- Parser
 
