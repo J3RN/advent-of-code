@@ -44,20 +44,22 @@ compactUpdates sectors lPtr rPtr
                                Nothing  -> compactUpdates sectors lPtr (rPtr - 1)
 
 contiguousCompact :: Array Int (Maybe NodeId) -> Array Int (Maybe NodeId)
-contiguousCompact sectors = contiguousCompact' sectors (snd . Array.bounds $ sectors)
+contiguousCompact sectors = contiguousCompact' sectors maxIx emptyCache
+  where maxIx = snd . Array.bounds $ sectors
+        emptyCache = Array.listArray (1,9) (repeat 0)
 
-contiguousCompact' :: Array Int (Maybe NodeId) -> Int -> Array Int (Maybe NodeId)
-contiguousCompact' sectors 0    = sectors
-contiguousCompact' sectors rPtr = case sectors ! rPtr of
-                                    Nothing     -> contiguousCompact' sectors (rPtr - 1)
-                                    Just nodeId -> let (rPtr', blockSize) = findBlockSize sectors rPtr nodeId
-                                                    in case findEmptySlot sectors blockSize rPtr' of
-                                                         Just ix -> contiguousCompact' (sectors // updates sectors ix (rPtr' + 1) blockSize) rPtr'
-                                                         Nothing -> contiguousCompact' sectors rPtr'
+contiguousCompact' :: Array Int (Maybe NodeId) -> Int -> Array Int Int -> Array Int (Maybe NodeId)
+contiguousCompact' sectors 0    _     = sectors
+contiguousCompact' sectors rPtr cache = case sectors ! rPtr of
+                                          Nothing     -> contiguousCompact' sectors (rPtr - 1) cache
+                                          Just nodeId -> let (rPtr', blockSize) = findBlockSize sectors rPtr nodeId
+                                                         in case findEmptySlot sectors blockSize rPtr' (cache ! blockSize) of
+                                                              Just ix -> contiguousCompact' (sectors // updates sectors ix (rPtr' + 1) blockSize) rPtr' (cache // [(blockSize, ix)])
+                                                              Nothing -> contiguousCompact' sectors rPtr' cache
   where findBlockSize :: Array Int (Maybe NodeId) -> Int -> Integer -> (Int, Int)
         findBlockSize sectors rPtr' nodeId = until (\(ix, _) -> ix == 0 || (sectors ! ix /= Just nodeId)) (bimap pred succ) (rPtr', 0)
-        findEmptySlot :: Array Int (Maybe NodeId) -> Int -> Int -> Maybe Int
-        findEmptySlot sectors blockSize maxIx = fst <$> List.find ((>= blockSize) . snd) (emptySlots sectors 0 maxIx)
+        findEmptySlot :: Array Int (Maybe NodeId) -> Int -> Int -> Int -> Maybe Int
+        findEmptySlot sectors blockSize maxIx ix = fst <$> List.find ((>= blockSize) . snd) (emptySlots sectors ix maxIx)
         emptySlots :: Array Int (Maybe NodeId) -> Int -> Int -> [(Int, Int)]
         emptySlots sectors ix maxIx | ix >= maxIx = []
         emptySlots sectors ix maxIx               = case sectors ! ix of
