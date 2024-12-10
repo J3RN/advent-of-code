@@ -1,36 +1,40 @@
-import           Data.Array   (Array, (!), (//))
-import qualified Data.Array   as Array
-import qualified Data.List    as List
-import           Data.Text    (Text)
-import qualified Data.Text.IO as T
-import           GHC.Num      (integerFromInt)
+import           Data.Array     (Array, (!), (//))
+import qualified Data.Array     as Array
+import           Data.Bifunctor (second)
+import qualified Data.List      as List
+import           Data.Maybe     (isJust)
+import           Data.Text      (Text)
+import qualified Data.Text.IO   as T
+import           GHC.Num        (integerFromInt)
 import           Text.Parsec
+
+type NodeId = Integer
 
 main :: IO ()
 main = do
   sectorList <- parseFromFile parseFile "input" >>= either (fail . show) pure
   let expandedSectorList = expand sectorList
   print . checksum . compact . listToArr . expand $ sectorList
-  print . checksum . _ . contiguousCompact . listToArr $ sectorList
+  print . checksum . contiguousCompact . listToArr . expand $ sectorList
 
 listToArr :: [a] -> Array Int a
 listToArr l = Array.listArray (0, length l - 1) l
 
 -- Convert the compact format to the expanded format
-expand ::[(Int, Maybe Integer)] -> [Maybe Integer]
+expand :: [(Int, Maybe NodeId)] -> [Maybe NodeId]
 expand = concatMap (uncurry replicate)
 
-checksum :: Array Int (Maybe Integer) -> Integer
+checksum :: Array Int (Maybe NodeId) -> NodeId
 checksum sectors = foldl u 0 (Array.assocs sectors)
   where u acc (i, e) = case e of
                               Just id -> acc + integerFromInt i * id
                               Nothing -> acc
 
-compact :: Array Int (Maybe Integer) -> Array Int (Maybe Integer)
+compact :: Array Int (Maybe NodeId) -> Array Int (Maybe NodeId)
 compact sectors = sectors // updates
   where updates = uncurry (compactUpdates sectors) (Array.bounds sectors)
 
-compactUpdates :: Array Int (Maybe Integer) -> Int -> Int -> [(Int, Maybe Integer)]
+compactUpdates :: Array Int (Maybe NodeId) -> Int -> Int -> [(Int, Maybe NodeId)]
 compactUpdates sectors lPtr rPtr
   | lPtr >= rPtr = []
   | otherwise = case sectors ! lPtr of
@@ -39,37 +43,38 @@ compactUpdates sectors lPtr rPtr
                                Just sub -> [(lPtr, Just sub), (rPtr, Nothing)] ++ compactUpdates sectors (lPtr + 1) (rPtr - 1)
                                Nothing  -> compactUpdates sectors lPtr (rPtr - 1)
 
--- This foldr is going to be hellaceously slow, but we need iterative updates to the sectors arr to
--- prevent double-allocating a slot
-contiguousCompact :: Array Int (Int, Maybe Integer) -> Array Int (Int, Maybe Integer)
-contiguousCompact sectors = foldr contiguousCompact' sectors (Array.assocs sectors)
+contiguousCompact :: Array Int (Maybe NodeId) -> Array Int (Maybe NodeId)
+contiguousCompact sectors = contiguousCompact' sectors (snd . Array.bounds $ sectors)
 
-contiguousCompact' :: (Int, (Int, Maybe Integer)) -> Array Int (Int, Maybe Integer) -> Array Int (Int, Maybe Integer)
-contiguousCompact' (_, (_, Nothing)) sectors = sectors
-contiguousCompact' (ix, (c, val)) sectors    = case findSizeSlot c sectors of
-                                                 (Just (ix2, (c2, _))) | ix2 < ix -> sectors // _
-                                                 Nothing    -> sectors
-  where
-    findSizeSlot :: Int -> Array Int (Int, Maybe Integer) -> Maybe (Int, (Int, Maybe Integer))
-    findSizeSlot c = List.find ((>= c) . fst) . Array.assocs
-
-
--- THIS DOESN'T WORK BECAUSE WE DON'T GO LINEARLY LTR
--- contiguousCompact :: Array Int (Int, Maybe Integer) -> Array Int (Int, Maybe Integer)
--- contiguousCompact sectors = sectors // updates
---   where updates = uncurry (contiguousCompact' sectors) (first (+ 1) $ Array.bounds sectors)
-
--- contiguousCompact' :: Array Int (Int, Maybe Integer) -> Int -> Int -> [(Int, (Int, Maybe Integer))]
--- contiguousCompact' sectors lPtr rPtr
---   | lPtr >= rPtr = []
---   | otherwise = case sectors ! rPtr of
---                   (_, Nothing)     -> contiguousCompact' sectors lPtr (rPtr -1)
---                   (c, Just nodeId) -> _
+contiguousCompact' :: Array Int (Maybe NodeId) -> Int -> Array Int (Maybe NodeId)
+contiguousCompact' sectors 0    = sectors
+contiguousCompact' sectors rPtr = case sectors ! rPtr of
+                                    Nothing     -> contiguousCompact' sectors (rPtr - 1)
+                                    Just nodeId -> let (rPtr', blockSize) = findBlockSize sectors rPtr nodeId
+                                                    in case findEmptySlot sectors blockSize rPtr' of
+                                                         Just ix -> contiguousCompact' (sectors // updates sectors ix (rPtr' + 1) blockSize) rPtr'
+                                                         Nothing -> contiguousCompact' sectors rPtr'
+  where findBlockSize :: Array Int (Maybe NodeId) -> Int -> Integer -> (Int, Int)
+        findBlockSize sectors rPtr' nodeId = if rPtr' == 0 || sectors ! rPtr' /= Just nodeId
+                                             then (rPtr', 0)
+                                             else second (+ 1) (findBlockSize sectors (rPtr' - 1) nodeId)
+        findEmptySlot :: Array Int (Maybe NodeId) -> Int -> Int -> Maybe Int
+        findEmptySlot sectors blockSize maxIx = fst <$> List.find ((>= blockSize) . snd) (emptySlots sectors 0 maxIx)
+        emptySlots :: Array Int (Maybe NodeId) -> Int -> Int -> [(Int, Int)]
+        emptySlots sectors ix maxIx | ix >= maxIx = []
+        emptySlots sectors ix maxIx               = case sectors ! ix of
+                                                      Just _ -> emptySlots sectors (ix + 1) maxIx
+                                                      Nothing -> let end = until (\ix' -> ix' > maxIx || isJust (sectors ! ix')) (+ 1) ix
+                                                                  in (ix, end - ix):emptySlots sectors end maxIx
+        updates :: Array Int (Maybe NodeId) -> Int -> Int -> Int -> [(Int, Maybe NodeId)]
+        updates _ _ _ 0 = []
+        updates sectors emptyStart fileStart fileSize =
+          [(emptyStart, sectors ! fileStart), (fileStart, Nothing)] ++ updates sectors (emptyStart + 1) (fileStart + 1) (fileSize - 1)
 
 -- Parser
 
 data ParseState = ParseState { _isFree :: Bool
-                             , _nodeId :: Integer
+                             , _nodeId :: NodeId
                              }
 type Parser = Parsec Text ParseState
 
@@ -84,10 +89,10 @@ parseFromFile p fname
          return (runP p initialState fname input)
 
 -- Parses the format used in the example, with `Nothing` representing free space
-parseFile :: Parser [(Int, Maybe Integer)]
+parseFile :: Parser [(Int, Maybe NodeId)]
 parseFile = manyTill parseSector (char '\n')
 
-parseSector :: Parser (Int, Maybe Integer)
+parseSector :: Parser (Int, Maybe NodeId)
 parseSector = do
   ParseState isFree nodeId <- getState
   c <- read . List.singleton <$> digit
