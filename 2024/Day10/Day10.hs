@@ -1,10 +1,12 @@
-import           Data.Bifunctor   (first)
-import           Data.Functor     (($>))
-import qualified Data.List        as List
-import           Data.Map         (Map, (!?))
-import qualified Data.Map         as Map
+import           Control.Applicative (liftA2)
+import           Data.Bifunctor      (first)
+import           Data.Functor        (($>))
+import qualified Data.List           as List
+import           Data.Map            (Map, (!?))
+import qualified Data.Map            as Map
+import           Data.Maybe          (mapMaybe)
 import           Text.Parsec
-import           Text.Parsec.Text (Parser, parseFromFile)
+import           Text.Parsec.Text    (Parser, parseFromFile)
 
 type Point = (Int, Int)
 type Height = Int
@@ -17,20 +19,20 @@ main = do
   print . sum . trailRatings $ topology
 
 trailheadCounts :: TopologyMap -> [Int]
-trailheadCounts topology = map (trailheadCount 1 . fst) $ filter ((== 0) . snd) $ Map.assocs topology
-  where trailheadCount :: Height -> Point -> Int
-        trailheadCount height point = length $ List.nub $ trailheadsFrom 1 point
-        trailheadsFrom :: Height -> Point -> [Point]
-        trailheadsFrom 9      point = filter (\neighbor -> topology !? neighbor == Just 9) $ neighbors point
-        trailheadsFrom height point = concatMap (trailheadsFrom (height + 1)) $ filter (\neighbor -> topology !? neighbor == Just height) $ neighbors point
+trailheadCounts topology = map trailheadCount $ filter ((== 0) . snd) $ Map.assocs topology
+  where trailheadCount :: (Point, Height) -> Int
+        trailheadCount = length . List.nub . trailheadsFrom
+        trailheadsFrom :: (Point, Height) -> [Point]
+        trailheadsFrom (point, 9)      = [point]
+        trailheadsFrom (point, height) = concatMap trailheadsFrom . filter ((== height + 1) . snd) . mapMaybe (liftA2 (<$>) (,) (topology !?)) . neighbors $ point
 
 trailRatings :: TopologyMap -> [Int]
-trailRatings topology = map (trailCount 1 . fst) $ filter ((== 0) . snd) $ Map.assocs topology
-  where trailCount :: Height -> Point -> Int
-        trailCount height point = length . List.nub $ trails height point
-        trails :: Height -> Point -> [[Point]]
-        trails 9      point = map ((point:) . List.singleton) $ filter (\neighbor -> topology !? neighbor == Just 9) $ neighbors point
-        trails height point = concatMap (map (point:) . trails (height + 1)) $ filter (\neighbor -> topology !? neighbor == Just height) $ neighbors point
+trailRatings topology = map trailCount $ filter ((== 0) . snd) $ Map.assocs topology
+  where trailCount :: (Point, Height) -> Int
+        trailCount = length . List.nub . trails
+        trails :: (Point, Height) -> [[Point]]
+        trails (point, 9)      = [[point]]
+        trails (point, height) = concatMap (map (point:) . trails) . filter ((== height + 1) . snd) . mapMaybe (\n -> (n,) <$> topology !? n) . neighbors $ point
 
 neighbors :: Point -> [Point]
 neighbors (x, y) = [(x - 1, y), (x, y - 1), (x + 1, y), (x, y + 1)]
