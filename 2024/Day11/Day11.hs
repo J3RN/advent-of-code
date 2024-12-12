@@ -5,19 +5,26 @@ import           GHC.Num     (integerLogBase)
 main :: IO ()
 main = do
   initialStones <- map read . words <$> readFile "input"
-  print . sum . map (length . reapply 25 (traceShowId . blink) . List.singleton) $ initialStones
-  -- print . sum . map (length . reapply 75 blink . List.singleton) $ initialStones
+  print . sum . map (lengthAfterBlinks 25) $ initialStones
+  print . sum . map (traceShowId . lengthAfterBlinks 75) $ initialStones
 
-blink :: [Integer] -> [Integer]
-blink = concatMap blinkStone
+lengthAfterBlinks :: Int -> Integer -> Integer
+lengthAfterBlinks 0 _ = 1
+lengthAfterBlinks blinks 0 = lengthAfterBlinks (blinks - 1) 1
+lengthAfterBlinks blinks s | even (numDigits s) = let (before, after) = splitNum s
+                                                   in lengthAfterBlinks (blinks - 1) before + lengthAfterBlinks (blinks - 1) after
+lengthAfterBlinks blinks s = lengthAfterBlinks (blinks - 1) (s * 2024)
 
-blinkStone :: Integer -> [Integer]
-blinkStone 0 = [1]
-blinkStone s | even (numDigits s) = splitNum s
-blinkStone s = [2024 * s]
+-- blink :: [Integer] -> [Integer]
+-- blink = concatMap blinkStone
 
-splitNum :: Integer -> [Integer]
-splitNum i = [i `div` midpoint, i `mod` midpoint]
+-- blinkStone :: Integer -> [Integer]
+-- blinkStone 0 = [1]
+-- blinkStone s | even (numDigits s) = splitNum s
+-- blinkStone s = [2024 * s]
+
+splitNum :: Integer -> (Integer, Integer)
+splitNum i = (i `div` midpoint, i `mod` midpoint)
   where midpoint = 10 ^ (numDigits i `div` 2)
 
 numDigits :: Integer -> Word
