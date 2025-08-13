@@ -1,12 +1,10 @@
 %% Rules of the game
 
 result(rock, paper, win).
-result(rock, scissors, loss).
-result(paper, rock, loss).
 result(paper, scissors, win).
 result(scissors, rock, win).
-result(scissors, paper, loss).
 result(X, X, draw).
+result(_, _, loss).
 
 %% Scoring
 
